@@ -6,12 +6,12 @@ from google.genai import types
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-# --- ১. কনফিগারেশন তথ্যসমূহ ---
+# --- ১. কনফিগারেশন ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8918221803:AAFQ_nxpm5KalCU4iA4mkUjrBtTMM3zOvBk")
-GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-4399251962"))
+GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004399251962"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LxXlPI1o_VWrogLjwWo1Ym5Ib5JmfV9zjPJl--wOBcw")
 
-# --- ২. Gemini AI Client ও নির্দেশিকা ---
+# --- ২. Gemini AI ---
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_INSTRUCTION = """
@@ -23,10 +23,9 @@ Language Rule:
 - Always mirror the language of the incoming message accurately.
 """
 
-# --- ৩. Telegram Application তৈরি ---
-telegram_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+# --- ৩. Telegram Application setup ---
+tg_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-# --- ৪. টেক্সট ও ভয়েস হ্যান্ডলার ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_chat or not update.message:
         return
@@ -79,29 +78,34 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-telegram_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-telegram_app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+tg_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+tg_app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-# --- ৫. Flask Web Server ও Webhook Endpoint ---
+# --- ৪. Flask App ---
 app = Flask(__name__)
-
-# টেলিগ্রাম অ্যাপ্লিকেশন ইনিশিয়ালাইজ করা
-asyncio.run(telegram_app.initialize())
 
 @app.route('/')
 def home():
-    return "Bot is alive and running!"
+    return "Bot is alive!"
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
     if request.method == "POST":
         try:
-            json_str = request.get_data(as_text=True)
-            update = Update.de_json(request.get_json(force=True), telegram_app.bot)
-            asyncio.run(telegram_app.process_update(update))
+            update = Update.de_json(request.get_json(force=True), tg_app.bot)
+            
+            # ইভেন্ট লুপ পরিচালনা
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            loop.run_until_complete(tg_app.initialize())
+            loop.run_until_complete(tg_app.process_update(update))
             return "ok", 200
         except Exception as e:
-            print(f"Webhook Processing Error: {e}")
+            print(f"Error in webhook: {e}")
             return "error", 500
 
 if __name__ == '__main__':
