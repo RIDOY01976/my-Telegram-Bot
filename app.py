@@ -1,34 +1,17 @@
 import os
 import asyncio
-from flask import Flask
-from threading import Thread
+from flask import Flask, request
 from google import genai
 from google.genai import types
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-# --- ১. Render Web Server (Keep Alive) ---
-app_flask = Flask('')
-
-@app_flask.route('/')
-def home():
-    return "Bot is alive and running!"
-
-def run_flask():
-    port = int(os.environ.get("PORT", 8080))
-    app_flask.run(host='0.0.0.0', port=port)
-
-def keep_alive():
-    t = Thread(target=run_flask)
-    t.daemon = True
-    t.start()
-
-# --- ২. কনফিগারেশন তথ্যসমূহ ---
+# --- ১. কনফিগারেশন তথ্যসমূহ ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8918221803:AAFQ_nxpm5KalCU4iA4mkUjrBtTMM3zOvBk")
 GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-4399251962"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LxXlPI1o_VWrogLjwWo1Ym5Ib5JmfV9zjPJl--wOBcw")
 
-# --- ৩. Gemini AI Client ও নির্দেশিকা ---
+# --- ২. Gemini AI Client ও নির্দেশিকা ---
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_INSTRUCTION = """
@@ -40,8 +23,15 @@ Language Rule:
 - Always mirror the language of the incoming message accurately.
 """
 
+# --- ৩. Telegram App ইনিশিয়ালাইজেশন ---
+application = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+
 # --- ৪. টেক্সট মেসেজ হ্যান্ডলার ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_chat or not update.message:
+        return
+
+    # শুধুমাত্র নির্দিষ্ট গ্রুপে রেসপন্স করবে
     if update.effective_chat.id != GROUP_CHAT_ID:
         return
 
@@ -63,10 +53,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- ৫. ভয়েস মেসেজ হ্যান্ডলার ---
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.effective_chat or not update.message:
+        return
+
+    # শুধুমাত্র নির্দিষ্ট গ্রুপে রেসপন্স করবে
     if update.effective_chat.id != GROUP_CHAT_ID:
         return
 
-    file_path = "temp_voice.ogg"
+    file_path = f"temp_voice_{update.message.message_id}.ogg"
     try:
         voice_file = await update.message.voice.get_file()
         await voice_file.download_to_drive(file_path)
@@ -93,14 +87,31 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if os.path.exists(file_path):
             os.remove(file_path)
 
-# --- ৬. বট স্টার্টার ---
-if __name__ == '__main__':
-    keep_alive()
+# হ্যান্ডলার যুক্ত করা
+application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+application.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
-    
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
-    
-    print("Bot is successfully running with Voice support & Web Server...")
-    app.run_polling()
+# --- ৬. Flask Webhook Server ---
+app_flask = Flask(__name__)
+
+@app_flask.route('/')
+def home():
+    return "Bot is alive and running!"
+
+@app_flask.route('/webhook', methods=['POST'])
+def webhook():
+    if request.method == "POST":
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+        loop.run_until_complete(application.initialize())
+        update = Update.de_json(request.get_json(force=True), application.bot)
+        loop.run_until_complete(application.process_update(update))
+        return "ok", 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 10000))
+    app_flask.run(host='0.0.0.0', port=port)
