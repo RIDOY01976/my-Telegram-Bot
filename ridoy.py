@@ -330,6 +330,7 @@ async def run_webhook(application: Application) -> None:
         return web.json_response({"ok": True})
 
     server = web.Application()
+    server.router.add_get("/", health)  # এটি রেন্ডার হেলথ চেক ও রুট হিট সামলানোর জন্য যুক্ত করা হয়েছে
     server.router.add_get(HEALTH_PATH, health)
     server.router.add_post(WEBHOOK_PATH, telegram_webhook)
     runner = web.AppRunner(server)
