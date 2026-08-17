@@ -20,7 +20,7 @@ from telegram.error import TelegramError
 
 # Telegram returns supergroup IDs with the -100 prefix. The user-provided
 # numeric suffix resolves to this exact group.
-GROUP_ID = -1004399251962
+GROUP_ID = -1004457441338
 CREATOR_NAME = "Hriday Developer"
 ADMIN_SILENCE_SECONDS = 120
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
