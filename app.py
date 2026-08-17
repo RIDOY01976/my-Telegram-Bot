@@ -6,12 +6,10 @@ from google.genai import types
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-# --- ১. কনফিগারেশন ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8918221803:AAFQ_nxpm5KalCU4iA4mkUjrBtTMM3zOvBk")
 GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004399251962"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LxXlPI1o_VWrogLjwWo1Ym5Ib5JmfV9zjPJl--wOBcw")
 
-# --- ২. Gemini AI ---
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SYSTEM_INSTRUCTION = """
@@ -23,7 +21,6 @@ Language Rule:
 - Always mirror the language of the incoming message accurately.
 """
 
-# --- ৩. Telegram Application setup ---
 tg_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -81,8 +78,12 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
 tg_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
 tg_app.add_handler(MessageHandler(filters.VOICE, handle_voice))
 
-# --- ৪. Flask App ---
 app = Flask(__name__)
+
+# অ্যাপ শুরু হওয়ার সাথে সাথে টেলিগ্রাম বোট ইনিশিয়ালাইজ করার জন্য
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+loop.run_until_complete(tg_app.initialize())
 
 @app.route('/')
 def home():
@@ -92,16 +93,8 @@ def home():
 def webhook():
     if request.method == "POST":
         try:
-            update = Update.de_json(request.get_json(force=True), tg_app.bot)
-            
-            # ইভেন্ট লুপ পরিচালনা
-            try:
-                loop = asyncio.get_event_loop()
-            except RuntimeError:
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-
-            loop.run_until_complete(tg_app.initialize())
+            json_data = request.get_json(force=True)
+            update = Update.de_json(json_data, tg_app.bot)
             loop.run_until_complete(tg_app.process_update(update))
             return "ok", 200
         except Exception as e:
