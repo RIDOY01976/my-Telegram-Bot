@@ -25,7 +25,7 @@ def keep_alive():
 
 # --- ২. কনফিগারেশন তথ্যসমূহ ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "8918221803:AAFQ_nxpm5KalCU4iA4mkUjrBtTMM3zOvBk")
-GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-1004399251962"))
+GROUP_CHAT_ID = int(os.environ.get("GROUP_CHAT_ID", "-4399251962"))
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AQ.Ab8RN6LxXlPI1o_VWrogLjwWo1Ym5Ib5JmfV9zjPJl--wOBcw")
 
 # --- ৩. Gemini AI Client ও নির্দেশিকা ---
