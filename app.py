@@ -94,4 +94,13 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             os.remove(file_path)
 
 # --- ৬. বট স্টার্টার ---
+if __name__ == '__main__':
+    keep_alive()
 
+    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
+    
+    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    app.add_handler(MessageHandler(filters.VOICE, handle_voice))
+    
+    print("Bot is successfully running with Voice support & Web Server...")
+    app.run_polling()
