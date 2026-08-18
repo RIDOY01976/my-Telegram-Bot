@@ -137,13 +137,13 @@ class GroupBot:
             "friendly for a group chat. Do not claim to be human, "
             f"and identify the creator as {CREATOR_NAME} if asked."
         )
-        response = await self.ai.models.generate_content(
+        response = self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=text,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                max_output_tokens=600,
-            ),
+            config={
+                "system_instruction": system_instruction,
+                "max_output_tokens": 600,
+            },
         )
         return (response.text or "").strip()
 
@@ -169,13 +169,13 @@ class GroupBot:
         )
 
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
-        response = await self.ai.models.generate_content(
+        response = self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=["Please process this audio message and respond appropriately.", audio_part],
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                max_output_tokens=700,
-            ),
+            config={
+                "system_instruction": system_instruction,
+                "max_output_tokens": 700,
+            },
         )
         answer = (response.text or "").strip()
         if not answer:
@@ -206,16 +206,16 @@ class GroupBot:
             prompt += f"\nThe member's question or caption is: {caption}"
 
         image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
-        response = await self.ai.models.generate_content(
+        response = self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=[prompt, image_part],
-            config=types.GenerateContentConfig(
-                system_instruction=(
+            config={
+                "system_instruction": (
                     "You are a careful image-recognition assistant in a Telegram "
                     f"group. The bot creator is {CREATOR_NAME}."
                 ),
-                max_output_tokens=700,
-            ),
+                "max_output_tokens": 700,
+            },
         )
         return (response.text or "").strip()
 
