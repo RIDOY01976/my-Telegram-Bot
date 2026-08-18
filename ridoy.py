@@ -1,4 +1,4 @@
-from __future__ import annotations
+    from __future__ import annotations
 
 import argparse
 import asyncio
@@ -69,8 +69,6 @@ class GroupBot:
 
         admin_status = await self._is_admin(context, user.id)
         if admin_status is None:
-            # If the bot cannot verify membership, fail closed rather than
-            # accidentally replying during an admin-only silence period.
             return
         if admin_status:
             self.admin_silence.reset()
@@ -139,7 +137,7 @@ class GroupBot:
             "friendly for a group chat. Do not claim to be human, "
             f"and identify the creator as {CREATOR_NAME} if asked."
         )
-        response = await self.ai.aio.models.generate_content(
+        response = await self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=text,
             config=types.GenerateContentConfig(
@@ -171,7 +169,7 @@ class GroupBot:
         )
 
         audio_part = types.Part.from_bytes(data=audio_bytes, mime_type=mime_type)
-        response = await self.ai.aio.models.generate_content(
+        response = await self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=["Please process this audio message and respond appropriately.", audio_part],
             config=types.GenerateContentConfig(
@@ -208,7 +206,7 @@ class GroupBot:
             prompt += f"\nThe member's question or caption is: {caption}"
 
         image_part = types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg")
-        response = await self.ai.aio.models.generate_content(
+        response = await self.ai.models.generate_content(
             model=GEMINI_MODEL,
             contents=[prompt, image_part],
             config=types.GenerateContentConfig(
@@ -303,7 +301,6 @@ def build_application() -> Application:
 
 
 async def run_webhook(application: Application) -> None:
-    """Serve Telegram updates over HTTP on the deployment's public port."""
     webhook_secret = os.getenv("TELEGRAM_WEBHOOK_SECRET")
     webhook_url = os.getenv("TELEGRAM_WEBHOOK_URL")
     port = int(os.getenv("PORT", "8080"))
@@ -330,7 +327,7 @@ async def run_webhook(application: Application) -> None:
         return web.json_response({"ok": True})
 
     server = web.Application()
-    server.router.add_get("/", health)  # এটি রেন্ডার হেলথ চেক ও রুট হিট সামলানোর জন্য যুক্ত করা হয়েছে
+    server.router.add_get("/", health)
     server.router.add_get(HEALTH_PATH, health)
     server.router.add_post(WEBHOOK_PATH, telegram_webhook)
     runner = web.AppRunner(server)
@@ -375,7 +372,6 @@ def main() -> None:
         level=os.getenv("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    # Telegram's HTTP URLs contain the bot token. Never emit request URLs.
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("httpx2").setLevel(logging.WARNING)
