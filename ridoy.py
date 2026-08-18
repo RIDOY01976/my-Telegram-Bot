@@ -15,7 +15,6 @@ from telegram.ext import (
     filters,
 )
 
-
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
@@ -27,12 +26,18 @@ if not GEMINI_API_KEY:
 client = genai.Client(api_key=GEMINI_API_KEY)
 GEMINI_MODEL = "gemini-3.1-flash-lite"
 ALLOWED_CHAT_ID = -1004399251962
-HEALTH_PORT = 8001
+
+# Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
+HEALTH_PORT = int(os.environ.get("PORT", 10000))
 
 web_app = Flask(__name__)
 
 
 @web_app.get("/")
+def home():
+    return "Bot is alive and running!", 200
+
+
 @web_app.get("/health")
 def health_check():
     return jsonify(
@@ -117,7 +122,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "to solve their problem or answer their query. If an audio message is attached, "
         "listen to it, transcribe it, understand its meaning, and respond helpfully. "
         "If the user asks who created or developed you, including phrases such as "
-        "\"তোমাকে কে তৈরি করেছে\", \"who made you\", or \"tomake ke toiri korse\", "
+        '"তোমাকে কে তৈরি করেছে", "who made you", or "tomake ke toiri korse", '
         "always respond that you were created by Hridoy Developer (হৃদয় ডেভেলপার), "
         "who is also the owner of this group (এই গ্রুপের অনার), and that he "
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
