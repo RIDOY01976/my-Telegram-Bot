@@ -23,7 +23,7 @@ from telegram.error import TelegramError
 GROUP_ID = -1004457441338
 CREATOR_NAME = "Hriday Developer"
 ADMIN_SILENCE_SECONDS = 120
-GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
 MAX_REPLY_LENGTH = 3900
 WEBHOOK_PATH = os.getenv("TELEGRAM_WEBHOOK_PATH", "/api/telegram/webhook")
 HEALTH_PATH = "/api/healthz"
