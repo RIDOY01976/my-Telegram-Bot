@@ -2,3 +2,4 @@ python-telegram-bot
 google-genai
 aiohttp
 flask
+Pillow
