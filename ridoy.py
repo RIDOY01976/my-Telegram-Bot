@@ -24,7 +24,7 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"  # Grounding জেনারেটরের জন্য উপযোগী মডেল
 ALLOWED_CHAT_ID = -1004399251962
 
 # Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
@@ -128,6 +128,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
+    # Google Search Grounding কনফিগারেশন
+    config = types.GenerateContentConfig(
+        tools=[{"google_search": {}}]
+    )
+
     try:
         if update.message.photo:
             caption = update.message.caption or "Please analyze this image."
@@ -138,6 +143,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[system_prompt, caption, image],
+                config=config,
             )
             await update.message.reply_text(response.text)
 
@@ -161,6 +167,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
+                config=config,
             )
             await update.message.reply_text(response.text)
 
@@ -170,6 +177,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=prompt,
+                config=config,
             )
             await update.message.reply_text(response.text)
 
