@@ -128,8 +128,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
-    # Google Search কনফিগারেশন
-    config = types.GenerateContentConfig(
+    # Google Search কনফিগারেশন সেটআপ
+    search_config = types.GenerateContentConfig(
         tools=[types.Tool(google_search=types.GoogleSearch())]
     )
 
@@ -143,9 +143,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[system_prompt, caption, image],
-                config=config,
+                config=search_config,
             )
-            await update.message.reply_text(response.text)
+            if response.text:
+                await update.message.reply_text(response.text)
 
         elif update.message.voice or update.message.audio:
             telegram_audio = update.message.voice or update.message.audio
@@ -167,19 +168,24 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
-                config=config,
+                config=search_config,
             )
-            await update.message.reply_text(response.text)
+            if response.text:
+                await update.message.reply_text(response.text)
 
         elif update.message.text:
             text = update.message.text
             prompt = f"{system_prompt}\n\nUser message: {text}"
-            response = client.models.generate_content(
+
+            # Google Search নির্বিঘ্নে ব্যবহারের জন্য Chat Session পদ্ধতি
+            chat = client.chats.create(
                 model=GEMINI_MODEL,
-                contents=prompt,
-                config=config,
+                config=search_config,
             )
-            await update.message.reply_text(response.text)
+            response = chat.send_message(prompt)
+
+            if response.text:
+                await update.message.reply_text(response.text)
 
     except Exception as error:
         print(f"Error processing message: {error}")
