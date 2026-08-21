@@ -24,7 +24,7 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"  # গুগল সার্চ টুল সাপোর্টের জন্য ২.৫ ফ্ল্যাশ মডেল ব্যবহার করা হয়েছে
 ALLOWED_CHAT_ID = -1004399251962
 
 # Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
@@ -113,19 +113,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_bot_paused():
         return
 
+    # বর্তমান তারিখ ও সময় সংগ্রহ (বাংলাদেশ টাইমজোনের জন্য UTC+6 যোগ করা হয়েছে)
+    now_utc = datetime.datetime.now(datetime.timezone.utc)
+    bd_time = now_utc + datetime.timedelta(hours=6)
+    current_datetime_str = bd_time.strftime("%A, %B %d, %Y - %I:%M:%S %p (Asia/Dhaka)")
+
     system_prompt = (
-        "You are an intelligent, helpful, and friendly Telegram group assistant. "
+        "You are an intelligent, highly accurate, helpful, and friendly Telegram group assistant. "
+        f"CURRENT LOCAL DATE AND TIME: {current_datetime_str}. "
+        "STRICT INSTRUCTION FOR FACTUAL ACCURACY: You must strictly provide accurate, verified, and factual answers based on real-time awareness. "
+        "Use Google Search whenever necessary to search for real-time information, latest phone models, custom recoveries (TWRP, OrangeFox), ROM files, kernels, software updates, or technical specifications. "
+        "DO NOT make up facts, hallucinate, or guess. If you do not find verified information or if you are unsure, politely state that you do not have that specific information. "
         "Detect the language of the user's message. If the user asks in Bengali, "
         "reply naturally in Bengali. If the user asks in English, reply in English. "
         "Always maintain a polite, human-like, conversational tone. "
         "If an image is attached, analyze the image along with any accompanying text "
-        "to solve their problem or answer their query. If an audio message is attached, "
+        "to solve their problem or answer their query accurately. If an audio message is attached, "
         "listen to it, transcribe it, understand its meaning, and respond helpfully. "
         "If the user asks who created or developed you, including phrases such as "
         '"তোমাকে কে তৈরি করেছে", "who made you", or "tomake ke toiri korse", '
         "always respond that you were created by Hridoy Developer (হৃদয় ডেভেলপার), "
         "who is also the owner of this group (এই গ্রুপের অনার), and that he "
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
+    )
+
+    # জেমিনি কনফিগারেশন - গুগল সার্চ টুল ও কড়া সিস্টেম ইনস্ট্রাকশন
+    config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
+        tools=[types.Tool(google_search=types.GoogleSearch())],
     )
 
     try:
@@ -137,7 +152,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             image = Image.open(io.BytesIO(photo_bytes))
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=[system_prompt, caption, image],
+                contents=[caption, image],
+                config=config,
             )
             await update.message.reply_text(response.text)
 
@@ -157,19 +173,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[
-                    system_prompt,
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
+                config=config,
             )
             await update.message.reply_text(response.text)
 
         elif update.message.text:
             text = update.message.text
-            prompt = f"{system_prompt}\n\nUser message: {text}"
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=prompt,
+                contents=text,
+                config=config,
             )
             await update.message.reply_text(response.text)
 
