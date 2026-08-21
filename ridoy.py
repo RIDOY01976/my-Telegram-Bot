@@ -8,7 +8,6 @@ import google.genai as genai
 from google.genai import types
 from PIL import Image
 
-# Timezone-এর জন্য zoneinfo ব্যবহার করা হয়েছে
 try:
     import zoneinfo
     BD_TZ = zoneinfo.ZoneInfo("Asia/Dhaka")
@@ -35,7 +34,6 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 GEMINI_MODEL = "gemini-3.1-flash-lite"
 ALLOWED_CHAT_ID = -1004399251962
 
-# Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
 
 web_app = Flask(__name__)
@@ -121,7 +119,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_bot_paused():
         return
 
-    # বর্তমান বাংলাদেশ সময় নির্ধারণ
     current_time_str = datetime.datetime.now(BD_TZ).strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
     system_prompt = (
@@ -144,9 +141,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
-    # Google Search Tool সেটআপ
+    # Google Search Tool-এর সঠিক কনফিগারেশন
     search_config = types.GenerateContentConfig(
-        tools=[{"google_search": {}}]
+        tools=[types.Tool(google_search=types.GoogleSearch())]
     )
 
     try:
@@ -198,7 +195,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(response.text)
 
     except Exception as error:
-        print(f"Error processing message: {error}")
+        print(f"Error processing message: {error}", flush=True)
 
 
 if __name__ == "__main__":
