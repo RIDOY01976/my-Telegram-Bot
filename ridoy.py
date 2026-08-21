@@ -25,8 +25,8 @@ if not GEMINI_API_KEY:
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# মডেল আপডেট করা হয়েছে
-GEMINI_MODEL = "gemini-1.5-flash"  
+# সঠিক মডেল নাম
+GEMINI_MODEL = "gemini-2.5-flash"  
 ALLOWED_CHAT_ID = -1004399251962
 
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
@@ -129,9 +129,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
+    # new google-genai SDK-র সঠিক Tool ফরম্যাট
     config = types.GenerateContentConfig(
         system_instruction=system_prompt,
-        tools=[{"google_search": {}}]
+        tools=[types.Tool(google_search=types.GoogleSearch())]
     )
 
     try:
