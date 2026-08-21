@@ -7,6 +7,14 @@ from flask import Flask, jsonify
 import google.genai as genai
 from google.genai import types
 from PIL import Image
+
+# Timezone-এর জন্য zoneinfo ব্যবহার করা হয়েছে
+try:
+    import zoneinfo
+    BD_TZ = zoneinfo.ZoneInfo("Asia/Dhaka")
+except Exception:
+    BD_TZ = datetime.timezone(datetime.timedelta(hours=6))
+
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
@@ -24,11 +32,10 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-
-# gemini-3.1-flash-lite ব্যবহার করা হচ্ছে
 GEMINI_MODEL = "gemini-3.1-flash-lite"
 ALLOWED_CHAT_ID = -1004399251962
 
+# Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
 
 web_app = Flask(__name__)
@@ -114,32 +121,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_bot_paused():
         return
 
-    # বাংলাদেশ সময় হিসাব (UTC+6)
-    now_utc = datetime.datetime.now(datetime.timezone.utc)
-    bd_time = now_utc + datetime.timedelta(hours=6)
-    current_datetime_str = bd_time.strftime("%A, %B %d, %Y - %I:%M:%S %p (Asia/Dhaka)")
+    # বর্তমান বাংলাদেশ সময় নির্ধারণ
+    current_time_str = datetime.datetime.now(BD_TZ).strftime("%Y-%m-%d %I:%M:%S %p %Z")
 
     system_prompt = (
-        "You are an intelligent, highly accurate, helpful, and friendly Telegram group assistant. "
-        f"CURRENT LOCAL DATE AND TIME: {current_datetime_str}. "
-        "STRICT INSTRUCTION FOR FACTUAL ACCURACY: Always provide verified, factual, and accurate information. "
-        "Use Google Search tool whenever needed to fetch real-time information, latest phone models, custom recoveries (TWRP, OrangeFox), ROM files, kernels, software updates, or technical specifications. "
-        "DO NOT make up facts, hallucinate, or guess. If you do not find verified information or if you are unsure, politely state that you do not have that specific information. "
-        "Detect the language of the user's message. If the user asks in Bengali, reply naturally in Bengali. If the user asks in English, reply in English. "
-        "Always maintain a polite, human-like, conversational tone. "
-        "If an image is attached, analyze the image along with any accompanying text to solve their problem or answer their query accurately. "
-        "If an audio message is attached, listen to it, transcribe it, understand its meaning, and respond helpfully. "
-        "If the user asks who created or developed you, including phrases such as "
+        "You are an intelligent, helpful, and friendly Telegram group assistant.\n"
+        f"Current Bangladesh Time (Asia/Dhaka): {current_time_str}\n\n"
+        "INSTRUCTIONS FOR ACCURACY AND GOOGLE SEARCH:\n"
+        "1. Always perform a Google Search before answering factual questions, mobile phone models, "
+        "custom ROMs, kernel specs, hardware information, news, or current events. Do NOT guess or hallucinate.\n"
+        "2. Ensure all provided information is 100% accurate and up-to-date. If you are unsure or information "
+        "is not available after searching, clearly state that you don't know rather than giving wrong information.\n"
+        "3. Detect the language of the user's message. If the user asks in Bengali, reply naturally in Bengali. "
+        "If the user asks in English, reply in English.\n"
+        "4. Always maintain a polite, human-like, conversational tone.\n"
+        "5. If an image is attached, analyze the image along with any accompanying text to solve their problem.\n"
+        "6. If an audio message is attached, listen to it, transcribe it, understand its meaning, and respond helpfully.\n"
+        "7. If the user asks who created or developed you, including phrases such as "
         '"তোমাকে কে তৈরি করেছে", "who made you", or "tomake ke toiri korse", '
         "always respond that you were created by Hridoy Developer (হৃদয় ডেভেলপার), "
         "who is also the owner of this group (এই গ্রুপের অনার), and that he "
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
-    # জেমিনি কনফিগারেশন - গুগল সার্চ সক্রিয় করা হলো
-    config = types.GenerateContentConfig(
-        system_instruction=system_prompt,
-        tools=[types.Tool(google_search=types.GoogleSearch())],
+    # Google Search Tool সেটআপ
+    search_config = types.GenerateContentConfig(
+        tools=[{"google_search": {}}]
     )
 
     try:
@@ -151,12 +158,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             image = Image.open(io.BytesIO(photo_bytes))
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=[image, caption],
-                config=config,
+                contents=[system_prompt, caption, image],
+                config=search_config,
             )
-            # টেক্সট ফিল্টার করে রিপ্লাই পাঠানো (যেন এরর না দেয়)
-            if response and hasattr(response, "text") and response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
         elif update.message.voice or update.message.audio:
             telegram_audio = update.message.voice or update.message.audio
@@ -174,23 +179,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[
+                    system_prompt,
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
-                config=config,
+                config=search_config,
             )
-            if response and hasattr(response, "text") and response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
         elif update.message.text:
             text = update.message.text
+            prompt = f"{system_prompt}\n\nUser message: {text}"
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=text,
-                config=config,
+                contents=prompt,
+                config=search_config,
             )
-            if response and hasattr(response, "text") and response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
     except Exception as error:
         print(f"Error processing message: {error}")
