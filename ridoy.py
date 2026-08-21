@@ -24,10 +24,11 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-GEMINI_MODEL = "gemini-2.5-flash"  # Grounding জেনারেটরের জন্য উপযোগী মডেল
+
+# মডেল আপডেট করা হয়েছে
+GEMINI_MODEL = "gemini-1.5-flash"  
 ALLOWED_CHAT_ID = -1004399251962
 
-# Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
 
 web_app = Flask(__name__)
@@ -128,8 +129,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
     )
 
-    # Google Search Grounding কনফিগারেশন
     config = types.GenerateContentConfig(
+        system_instruction=system_prompt,
         tools=[{"google_search": {}}]
     )
 
@@ -142,7 +143,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             image = Image.open(io.BytesIO(photo_bytes))
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=[system_prompt, caption, image],
+                contents=[caption, image],
                 config=config,
             )
             await update.message.reply_text(response.text)
@@ -163,7 +164,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[
-                    system_prompt,
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
@@ -173,10 +173,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         elif update.message.text:
             text = update.message.text
-            prompt = f"{system_prompt}\n\nUser message: {text}"
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                contents=prompt,
+                contents=text,
                 config=config,
             )
             await update.message.reply_text(response.text)
