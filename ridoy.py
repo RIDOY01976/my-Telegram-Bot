@@ -16,10 +16,12 @@ from duckduckgo_search import DDGS
 from PIL import Image, ImageDraw, ImageFont
 
 # ==================== CONFIGURATION ====================
-BOT_TOKEN = os.environ.get("BOT_TOKEN")
+# কোডেই সরাসরি টোকেন সেট করা হলো যেন Render এরর না দেয়
+BOT_TOKEN = "8929451941:AAFASeHs2D3RI85W2Xe8dxNankB_QV5mvpQ"
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
-genai.configure(api_key=GEMINI_API_KEY)
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 
 # ==================== FLASK KEEP-ALIVE SERVER ====================
 app = Flask(__name__)
@@ -51,7 +53,7 @@ SYSTEM_PROMPT = (
 # ==================== GEMINI HELPER ====================
 def generate_gemini_response(chat_id, user_message, image=None, audio_file=None):
     model = genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
+        model_name="gemini-1.5-flash",
         system_instruction=SYSTEM_PROMPT
     )
     
@@ -92,12 +94,10 @@ def perform_web_search(query):
 
 # ==================== WELCOME IMAGE CARD GENERATOR ====================
 async def create_welcome_card(context, user):
-    """মেম্বারের প্রোফাইল পিকচার এবং ওয়েলকাম কার্ড ব্যানার তৈরি করে"""
     card_width, card_height = 800, 400
     image = Image.new("RGB", (card_width, card_height), color=(15, 23, 42))
     draw = ImageDraw.Draw(image)
     
-    # বর্ডার ও ডেকোরেশন
     draw.rectangle([12, 12, card_width-12, card_height-12], outline=(0, 229, 255), width=4)
     draw.rectangle([20, 20, card_width-20, card_height-20], outline=(59, 130, 246), width=1)
     
@@ -105,7 +105,6 @@ async def create_welcome_card(context, user):
     group_text = "Free Rooting Zone 💯"
     name_text = f"{user.full_name}"
     
-    # প্রোফাইল পিকচার ডাউনলোড
     user_avatar = None
     try:
         photos = await context.bot.get_user_profile_photos(user.id, limit=1)
@@ -118,13 +117,11 @@ async def create_welcome_card(context, user):
     except Exception as e:
         print(f"Avatar fetch error: {e}")
 
-    # ডিসপ্লে প্রোফাইল পিক
     if user_avatar:
         image.paste(user_avatar, (55, 125))
     else:
         draw.rectangle([55, 125, 205, 275], fill=(30, 41, 59), outline=(0, 229, 255), width=2)
 
-    # টেক্সট বসানো
     draw.text((235, 90), title_text, fill=(255, 255, 255))
     draw.text((235, 130), group_text, fill=(0, 229, 255))
     draw.text((235, 195), f"Member: {name_text}", fill=(250, 204, 21))
@@ -143,7 +140,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
             
         welcome_img = await create_welcome_card(context, new_user)
         caption = (
-            f"👋 **স্বাগতম {new_user.mention_markdown_v2()}\!**\n\n"
+            f"👋 **স্বাগতম {new_user.full_name}!**\n\n"
             f"আমাদের **Free Rooting Zone💯** পরিবারে আপনাকে স্বাগতম।\n"
             f"এখানে আপনি অ্যান্ড্রয়েড রুট, কাস্টম রম, রিকভারি এবং যেকোনো সাহায্য পাবেন।\n\n"
             f"👑 **Owner & Developer:** HRIDOY"
@@ -152,7 +149,7 @@ async def welcome_new_member(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await update.message.reply_photo(
             photo=welcome_img,
             caption=caption,
-            parse_mode="MarkdownV2"
+            parse_mode="Markdown"
         )
 
 # ==================== ADMIN PAUSE SYSTEM ====================
@@ -170,20 +167,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat_id = update.effective_chat.id
     user = update.effective_user
     
-    # অ্যাডমিন মেসেজ দিলে বোট ২ মিনিটের জন্য পজ হবে
-    member = await context.bot.get_chat_member(chat_id, user.id)
-    if member.status in ['creator', 'administrator']:
-        IS_PAUSED = True
-        if PAUSE_TIMER_TASK and not PAUSE_TIMER_TASK.done():
-            PAUSE_TIMER_TASK.cancel()
-        PAUSE_TIMER_TASK = asyncio.create_task(asyncio.sleep(120))
-        PAUSE_TIMER_TASK.add_done_callback(lambda t: asyncio.run_coroutine_threadsafe(resume_bot(context), asyncio.get_event_loop()))
-        return
+    try:
+        member = await context.bot.get_chat_member(chat_id, user.id)
+        if member.status in ['creator', 'administrator']:
+            IS_PAUSED = True
+            if PAUSE_TIMER_TASK and not PAUSE_TIMER_TASK.done():
+                PAUSE_TIMER_TASK.cancel()
+            PAUSE_TIMER_TASK = asyncio.create_task(asyncio.sleep(120))
+            PAUSE_TIMER_TASK.add_done_callback(lambda t: asyncio.run_coroutine_threadsafe(resume_bot(context), asyncio.get_event_loop()))
+            return
+    except Exception as e:
+        print(f"Admin check error: {e}")
 
     if IS_PAUSED:
         return
 
-    # ইনপুট মেসেজ ও মিডিয়া ধরা
     message = update.message
     text_input = message.text or message.caption or ""
     image_obj = None
@@ -200,7 +198,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         audio_bytes = await audio_file.download_as_bytearray()
         audio_obj = {"mime_type": "audio/ogg", "data": bytes(audio_bytes)}
 
-    # লাইভ ওয়েব সার্চ
     search_context = ""
     if text_input and not image_obj and not audio_obj:
         search_context = perform_web_search(text_input)
@@ -212,24 +209,18 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not prompt and not image_obj and not audio_obj:
         return
 
-    # উত্তর জেনারেট করা
     response_text = generate_gemini_response(chat_id, prompt, image=image_obj, audio_file=audio_obj)
     await message.reply_text(response_text)
 
 # ==================== MAIN BOT LAUNCHER ====================
 def main():
     application = Application.builder().token(BOT_TOKEN).build()
-
-    # ওয়েলকাম মেসেজ হ্যান্ডলার
     application.add_handler(MessageHandler(filters.StatusUpdate.NEW_CHAT_MEMBERS, welcome_new_member))
-    
-    # সাধারণ মেসেজ হ্যান্ডলার
     application.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, handle_message))
-
-    # রেন্ডার সার্ভার চালু রাখা
+    
     import threading
     threading.Thread(target=lambda: app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 8080))), daemon=True).start()
-
+    
     application.run_polling()
 
 if __name__ == '__main__':
