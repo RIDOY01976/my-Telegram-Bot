@@ -1,5 +1,5 @@
-Pillow
-Flask
-python-telegram-bot
+python-telegram-bot==20.7
 google-generativeai
 duckduckgo_search
+Pillow
+Flask
