@@ -1,4 +1,6 @@
 python-telegram-bot==20.7
 google-genai
+duckduckgo_search
 aiohttp
-typing-extensions
+Pillow
+Flask
