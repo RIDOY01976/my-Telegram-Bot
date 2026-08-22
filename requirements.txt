@@ -1,5 +1,5 @@
 Pillow
 Flask
 python-telegram-bot
-google-genai
-duckduckgo-search
+google-generativeai
+duckduckgo_search
