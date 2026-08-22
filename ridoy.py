@@ -3,6 +3,7 @@ import io
 import os
 from threading import Thread
 
+from duckduckgo_search import DDGS
 from flask import Flask, jsonify
 import google.genai as genai
 from google.genai import types
@@ -27,7 +28,6 @@ client = genai.Client(api_key=GEMINI_API_KEY)
 GEMINI_MODEL = "gemini-3.1-flash-lite"
 ALLOWED_CHAT_ID = -1004399251962
 
-# Render Environment Variable থেকে PORT নেবে, না পেলে ১০০০০ ব্যবহার করবে
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
 
 web_app = Flask(__name__)
@@ -82,6 +82,20 @@ def is_bot_paused() -> bool:
     return False
 
 
+# ওয়েব সার্চ করার হেলপার ফাংশন
+def perform_web_search(query: str) -> str:
+    try:
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=3):
+                results.append(f"Title: {r['title']}\nSnippet: {r['body']}")
+        if results:
+            return "\n\n".join(results)
+    except Exception as e:
+        print(f"Search error: {e}")
+    return "No search results found."
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     global last_admin_activity
 
@@ -118,6 +132,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Detect the language of the user's message. If the user asks in Bengali, "
         "reply naturally in Bengali. If the user asks in English, reply in English. "
         "Always maintain a polite, human-like, conversational tone. "
+        "If search context is provided, use it to answer the question accurately and concisely. "
         "If an image is attached, analyze the image along with any accompanying text "
         "to solve their problem or answer their query. If an audio message is attached, "
         "listen to it, transcribe it, understand its meaning, and respond helpfully. "
@@ -126,11 +141,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "always respond that you were created by Hridoy Developer (হৃদয় ডেভেলপার), "
         "who is also the owner of this group (এই গ্রুপের অনার), and that he "
         "constantly and regularly updates you (তিনিই আমাকে প্রতিনিয়ত আপডেট করেন)."
-    )
-
-    # Google Search কনফিগারেশন সেটআপ
-    search_config = types.GenerateContentConfig(
-        tools=[types.Tool(google_search=types.GoogleSearch())]
     )
 
     try:
@@ -143,10 +153,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             response = client.models.generate_content(
                 model=GEMINI_MODEL,
                 contents=[system_prompt, caption, image],
-                config=search_config,
             )
-            if response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
         elif update.message.voice or update.message.audio:
             telegram_audio = update.message.voice or update.message.audio
@@ -168,24 +176,23 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     audio_part,
                     "Listen to this audio, transcribe it, understand it, and respond to the speaker.",
                 ],
-                config=search_config,
             )
-            if response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
         elif update.message.text:
             text = update.message.text
-            prompt = f"{system_prompt}\n\nUser message: {text}"
-
-            # Google Search নির্বিঘ্নে ব্যবহারের জন্য Chat Session পদ্ধতি
-            chat = client.chats.create(
+            
+            # ব্যাকগ্রাউন্ডে ফ্রি ওয়েব সার্চ চালানো
+            search_data = perform_web_search(text)
+            
+            # ওয়েব সার্চের তথ্যসহ প্রম্পট তৈরি
+            prompt = f"{system_prompt}\n\nWeb Search Information:\n{search_data}\n\nUser message: {text}"
+            
+            response = client.models.generate_content(
                 model=GEMINI_MODEL,
-                config=search_config,
+                contents=prompt,
             )
-            response = chat.send_message(prompt)
-
-            if response.text:
-                await update.message.reply_text(response.text)
+            await update.message.reply_text(response.text)
 
     except Exception as error:
         print(f"Error processing message: {error}")
