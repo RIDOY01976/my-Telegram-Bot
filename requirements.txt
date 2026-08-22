@@ -2,3 +2,4 @@ Pillow
 Flask
 python-telegram-bot
 google-genai
+ddgs
