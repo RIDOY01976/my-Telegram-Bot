@@ -2,7 +2,6 @@ import datetime
 import io
 import os
 from threading import Thread
-
 from duckduckgo_search import DDGS
 from flask import Flask, jsonify
 import google.genai as genai
@@ -25,7 +24,7 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY is not configured")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-GEMINI_MODEL = "gemini-3.1-flash-lite"
+GEMINI_MODEL = "gemini-2.5-flash"
 ALLOWED_CHAT_ID = -1004399251962
 
 HEALTH_PORT = int(os.environ.get("PORT", 10000))
@@ -82,12 +81,12 @@ def is_bot_paused() -> bool:
     return False
 
 
-# ওয়েব সার্চ করার হেলপার ফাংশন
+# ফ্রি ওয়েব সার্চ করার উন্নত হেলপার ফাংশন
 def perform_web_search(query: str) -> str:
     try:
         results = []
         with DDGS() as ddgs:
-            for r in ddgs.text(query, max_results=3):
+            for r in ddgs.text(query, region="bn-bd", max_results=4):
                 results.append(f"Title: {r['title']}\nSnippet: {r['body']}")
         if results:
             return "\n\n".join(results)
@@ -127,7 +126,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if is_bot_paused():
         return
 
+    # সিস্টেম থেকে আসল বর্তমান সময় বের করা
+    current_time_str = datetime.datetime.now().strftime("%A, %d %B %Y, %I:%M %p")
+
     system_prompt = (
+        f"Current real-time date and time is: {current_time_str}. "
         "You are an intelligent, helpful, and friendly Telegram group assistant. "
         "Detect the language of the user's message. If the user asks in Bengali, "
         "reply naturally in Bengali. If the user asks in English, reply in English. "
